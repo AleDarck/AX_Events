@@ -36,7 +36,9 @@ local function getNearestDownedPlayer(maxDist)
             local ped  = GetPlayerPed(playerId)
             local dist = #(myCoords - GetEntityCoords(ped))
             if dist < closestDist then
-                if Player(pid).state.isDead then
+                local isWrithing = IsEntityPlayingAnim(ped, 'combat@damage@writhe', 'writhe_loop', 3)
+                local isDead     = IsEntityPlayingAnim(ped, 'dead', 'dead_a', 3)
+                if isWrithing or isDead then
                     closestDist = dist
                     closest     = { serverId = pid, ped = ped }
                 end
@@ -174,89 +176,83 @@ local isDoingRCP = false
 
 local function useIfaks()
     if isDoingRCP then return end
-    isDoingRCP = true
 
-    Citizen.CreateThreadNow(function()
-        print('[AX_Events DEBUG] useIfaks iniciado')
+    CreateThread(function()
+        local xPlayer = ESX.GetPlayerData()
+        if not xPlayer then return end
 
+        ESX.TriggerServerCallback('AX_Events:getProfession', function(profession)
+        if profession ~= Config.MedicProfession then
+            lib.notify({ title = 'AX Events', description = 'No tienes la profesión requerida.', type = 'error' })
+            return
+        end
+
+        -- 2. Buscar jugador abatido cercano
         local target = getNearestDownedPlayer(Config.ReviveDistance)
-        print('[AX_Events DEBUG] Target: ' .. tostring(target))
         if not target then
             lib.notify({ title = 'AX Events', description = 'No hay ningún jugador abatido cerca.', type = 'error' })
+            return
+        end
+
+        -- 3. Animación de buscar en el suelo mientras hace el minijuego
+        local myPed = PlayerPedId()
+        loadAnimDict('amb@medic@standing@kneel@idle_a')
+        TaskPlayAnim(myPed, 'amb@medic@standing@kneel@idle_a', 'idle_a', 8.0, -8.0, -1, 49, 0, false, false, false)
+
+        -- 4. Minijuego — una sola vez, si falla se cancela todo
+        local gameData = {
+            totalNumbers         = Config.MinigameData.totalNumbers,
+            seconds              = Config.MinigameData.seconds,
+            timesToChangeNumbers = Config.MinigameData.timesToChangeNumbers,
+            amountOfGames        = Config.MinigameData.amountOfGames,
+            incrementByAmount    = Config.MinigameData.incrementByAmount,
+        }
+
+        local result = exports['pure-minigames']:numberCounter(gameData)
+        StopAnimTask(myPed, 'amb@medic@standing@kneel@idle_a', 'idle_a', 1.0)
+
+        if not result then
+            lib.notify({ title = 'AX Events', description = 'Fallaste el minijuego.', type = 'error' })
             isDoingRCP = false
             return
         end
-        print('[AX_Events DEBUG] Target serverId: ' .. tostring(target.serverId))
 
-        ESX.TriggerServerCallback('AX_Events:getProfession', function(profession)
-            print('[AX_Events DEBUG] Profesion recibida: ' .. tostring(profession))
-            print('[AX_Events DEBUG] Profesion requerida: ' .. tostring(Config.MedicProfession))
+        -- 4. Consumir item ANTES de la progressbar
+        TriggerServerEvent('AX_Events:removeItem', Config.IfaksItem, 1)
 
-            if profession ~= Config.MedicProfession then
-                lib.notify({ title = 'AX Events', description = 'No tienes la profesión requerida.', type = 'error' })
-                isDoingRCP = false
-                return
+        -- 5. Progressbar + animación RCP
+        isDoingRCP = true
+
+        loadAnimDict(Config.RCPAnim.dict)
+        local myPed = PlayerPedId()
+        TaskPlayAnim(myPed, Config.RCPAnim.dict, Config.RCPAnim.anim, 8.0, -8.0, -1, Config.RCPAnim.flag, 0, false, false, false)
+
+        exports['AX_ProgressBar']:Progress({
+            duration = Config.RCPProgressBar.duration,
+            label    = Config.RCPProgressBar.label,
+            useWhileDead = false,
+            canCancel    = true,
+            controlDisables = {
+                disableMovement    = true,
+                disableCarMovement = true,
+                disableMouse       = false,
+                disableCombat      = true,
+            },
+        }, function(cancelled)
+            StopAnimTask(myPed, Config.RCPAnim.dict, Config.RCPAnim.anim, 1.0)
+            isDoingRCP = false
+
+            if not cancelled then
+                TriggerServerEvent('AX_Events:revivePlayer', target.serverId)
+                lib.notify({ title = 'AX Events', description = 'Paciente reanimado con éxito.', type = 'success' })
+            else
+                lib.notify({ title = 'AX Events', description = 'RCP cancelado.', type = 'error' })
             end
-
-            CreateThread(function()
-                -- Animación arrodillado
-                local myPed = PlayerPedId()
-                loadAnimDict('amb@medic@kneeling@tendtovictim@idle_a')
-                TaskPlayAnim(myPed, 'amb@medic@kneeling@tendtovictim@idle_a', 'idle_a', 8.0, -8.0, -1, 49, 0, false, false, false)
-
-                -- Minijuego
-                local gameData = {
-                    totalNumbers         = Config.MinigameData.totalNumbers,
-                    seconds              = Config.MinigameData.seconds,
-                    timesToChangeNumbers = Config.MinigameData.timesToChangeNumbers,
-                    amountOfGames        = Config.MinigameData.amountOfGames,
-                    incrementByAmount    = Config.MinigameData.incrementByAmount,
-                }
-
-                local result = exports['pure-minigames']:numberCounter(gameData)
-                print('[AX_Events DEBUG] Resultado minijuego: ' .. tostring(result))
-                StopAnimTask(myPed, 'amb@medic@kneeling@tendtovictim@idle_a', 'idle_a', 1.0)
-
-                if not result then
-                    lib.notify({ title = 'AX Events', description = 'Fallaste el minijuego.', type = 'error' })
-                    isDoingRCP = false
-                    return
-                end
-
-                TriggerServerEvent('AX_Events:removeItem', Config.IfaksItem, 1)
-
-                loadAnimDict(Config.RCPAnim.dict)
-                TaskPlayAnim(myPed, Config.RCPAnim.dict, Config.RCPAnim.anim, 8.0, -8.0, -1, Config.RCPAnim.flag, 0, false, false, false)
-
-                print('[AX_Events DEBUG] Iniciando progressbar...')
-                exports['AX_ProgressBar']:Progress({
-                    duration     = Config.RCPProgressBar.duration,
-                    label        = Config.RCPProgressBar.label,
-                    useWhileDead = false,
-                    canCancel    = true,
-                    controlDisables = {
-                        disableMovement    = true,
-                        disableCarMovement = true,
-                        disableMouse       = false,
-                        disableCombat      = true,
-                    },
-                }, function(cancelled)
-                    print('[AX_Events DEBUG] Progressbar terminada, cancelled: ' .. tostring(cancelled))
-                    StopAnimTask(myPed, Config.RCPAnim.dict, Config.RCPAnim.anim, 1.0)
-                    isDoingRCP = false
-
-                    if not cancelled then
-                        print('[AX_Events DEBUG] Enviando revive a serverId: ' .. tostring(target.serverId))
-                        TriggerServerEvent('AX_Events:revivePlayer', target.serverId)
-                        lib.notify({ title = 'AX Events', description = 'Paciente reanimado con éxito.', type = 'success' })
-                    else
-                        lib.notify({ title = 'AX Events', description = 'RCP cancelado.', type = 'error' })
-                    end
-                end)
-            end)
         end)
-    end)
-end
+
+        end) -- fin lib.callback
+    end)     -- fin CreateThread
+end          -- fin useIfaks
 
 exports('useIfaks', useIfaks)
 
