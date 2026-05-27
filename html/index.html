@@ -3,20 +3,59 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AX_Events</title>
+    <title>AX Looting</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Poppins:wght@300;400;600&family=Fugaz+One&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-    <!--
-        AX_Events | NUI
-        Actualmente los tres eventos no requieren NUI propio.
-        Este archivo está reservado para futuras funcionalidades
-        que necesiten interfaz gráfica personalizada.
-    -->
+    <!-- ===================================================
+         OVERLAY DE FONDO
+    ==================================================== -->
+    <div id="overlay" class="overlay hidden"></div>
 
-    <div id="ax-events-root" style="display:none;">
-        <!-- Contenido NUI futuro -->
+    <!-- ===================================================
+         PANEL PRINCIPAL
+    ==================================================== -->
+    <div id="lootPanel" class="loot-panel hidden">
+
+        <!-- Header -->
+        <div class="panel-header">
+            <div class="header-left">
+                <i class="fa-solid fa-skull header-icon"></i>
+                <span class="panel-title">BOTIN ENCONTRADO</span>
+            </div>
+            <button id="btnClose" class="btn-close" title="Cerrar">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Separador decorativo -->
+        <div class="header-divider"></div>
+
+        <!-- Zona de cards -->
+        <div id="lootGrid" class="loot-grid">
+            <!-- Cards generadas dinamicamente -->
+        </div>
+
+        <!-- Estado vacio -->
+        <div id="emptyState" class="empty-state hidden">
+            <i class="fa-solid fa-box-open"></i>
+            <p>No hay nada mas que recoger</p>
+        </div>
+
+        <!-- Footer con boton Recoger Todo -->
+        <div class="panel-footer">
+            <div class="footer-info">
+                <i class="fa-solid fa-hand"></i>
+                <span id="itemCount">0 items encontrados</span>
+            </div>
+            <button id="btnCollectAll" class="btn-collect-all">
+                <i class="fa-solid fa-bag-shopping"></i>
+                RECOGER TODO
+            </button>
+        </div>
     </div>
 
     <script src="script.js"></script>

@@ -1,12 +1,11 @@
 fx_version 'cerulean'
 game 'gta5'
 lua54 'yes'
-description 'AX_Events - Multi-event system'
+author 'AX_Scripts'
+description 'AX_Looting - Sistema de Looting para Zombies'
 version '1.0.0'
-author 'AX Scripts'
 
 shared_scripts {
-    '@ox_lib/init.lua',
     'config.lua',
 }
 
@@ -28,11 +27,8 @@ files {
 }
 
 dependencies {
-    'ox_lib',
-    'ox_inventory',
+    'es_extended',
     'oxmysql',
-    'esx_ambulancejob',
-    'pure-minigames',
+    'ox_inventory',
     'AX_ProgressBar',
-    'hrs_zombies_V2',
 }
